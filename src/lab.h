@@ -1687,6 +1687,7 @@ static u8 LabOSD_ID[] = {
     OSD_RollAirdodgeInterrupt,
     OSD_BoostGrab,
     OSD_ActOoWait,
+    OSD_ActOoAerial,
     OSD_ActOoAirborne,
     OSD_ActOoJumpSquat,
     OSD_Fastfall,
@@ -1752,6 +1753,11 @@ static EventOption LabOptions_OSDs[] = {
     {
         .kind = OPTKIND_TOGGLE,
         .name = "Act OoLag",
+        .OnChange = Lab_ChangeOSDs,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = "Act OoAerial",
         .OnChange = Lab_ChangeOSDs,
     },
     {
