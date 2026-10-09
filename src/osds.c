@@ -125,19 +125,22 @@ static void RunOSD_ActOoAerial(GOBJ *ft, GOBJ *ft_sub) {
         return;
     }
 
-    int atk_state = ft_data->state_id; //for checking frame one same aerials
+    int atk_state = ft_data->state_id; 
 
     static int osd_start_frame = 0;
+    static int IASA_start_frame = 0;
 
-    const int timeout = 15; //too long ?
+    const int timeout = 15;
 
-    // "actionable" if either state changed or in iasa
-    //also checks for state not changing but state frames being less in case of frame one same aerial out of iasa
-    if ((atk_hit_state[ply] != atk_state || CheckIASA(ft_data) 
-        || (atk_hit_state[ply] == atk_state && ft_data->TM.state_frame < prev_state_frame[ply]))) {
-        
-        if (osd_start_frame == 0) osd_start_frame = stc_match->time_frames;
-    }
+    //checks for state changing
+    //also checks for state not changing but state frames being decreased in case of frame one same aerial
+    if ((atk_hit_state[ply] != atk_state || (atk_hit_state[ply] == atk_state && ft_data->TM.state_frame < prev_state_frame[ply]))
+        && osd_start_frame == 0)
+        osd_start_frame = stc_match->time_frames;
+    
+    //checks for if IASA frames and starts timer for them for aerial and dj which can use IASA frames 
+    if (CheckIASA(ft_data) && IASA_start_frame == 0)
+        IASA_start_frame = stc_match->time_frames;
 
     //reset if hit ground
     if (atk_state == ASID_LANDING || (atk_state >= ASID_LANDINGAIRN && atk_state <= ASID_LANDINGAIRLW)) {
@@ -145,22 +148,31 @@ static void RunOSD_ActOoAerial(GOBJ *ft, GOBJ *ft_sub) {
         atk_hit_state[ply] = 0;
     }
 
-    //if checking for airdodge need more logic since cant airdodge oo iasa frames (second osdstartframe var could work)
-    //                                                                         vvv  prevents it calling the residual frames of the first aerial a new aerial thats out frame one during its iasa
-    if ((osd_start_frame != 0) && ((IsAerialState(ft_data->kind, atk_state) && !CheckIASA(ft_data)) 
-        || DoubleJumpCheck(ft_data->kind, atk_state) || IsAirSpecialMoveStartupState(ft_data->kind, atk_state))) { 
-        int speed = stc_match->time_frames - osd_start_frame + 1; //think i need the off by 1
-        
-        if (speed <= timeout && speed > 0){ //for replays
+    if (osd_start_frame != 0 || IASA_start_frame != 0) {
+        int speed_frames = 0;                            //vvv  prevents it calling the residual frames of the first aerial a new aerial thats out frame one during its iasa
+        if ((IsAerialState(ft_data->kind, atk_state) && !CheckIASA(ft_data)) || DoubleJumpCheck(ft_data->kind, atk_state)){
+            speed_frames = IASA_start_frame != 0 ? IASA_start_frame : osd_start_frame;
+
+            osd_start_frame = 0;
+            IASA_start_frame = 0;
+            atk_hit_state[ply] = 0;
+        }
+        if (IsAirSpecialMoveStartupState(ft_data->kind, atk_state) || atk_state == ASID_ESCAPEAIR || ASID_LANDINGFALLSPECIAL){
+            speed_frames = osd_start_frame; //these actions can't be used during IASA frames
+
+            osd_start_frame = 0;
+            IASA_start_frame = 0;
+            atk_hit_state[ply] = 0;
+        }
+
+        speed_frames = stc_match->time_frames - speed_frames + 1;
+        if (speed_frames <= timeout && speed_frames > 0){
             Message_Display(
                 OSD_ActOoAerial, ft_data->ply,
-                speed == 1 ? MSGCOLOR_GREEN : MSGCOLOR_WHITE, // add red for rly late ?
-                "Act OoAerial\nFrame: %d", speed
+                speed_frames == 1 ? MSGCOLOR_GREEN : MSGCOLOR_WHITE, 
+                "Act OoAerial\nFrame: %d", speed_frames
             );
         }
-        
-        osd_start_frame = 0;
-        atk_hit_state[ply] = 0;
     }
     prev_state_frame[ply] = ft_data->TM.state_frame;
 }
